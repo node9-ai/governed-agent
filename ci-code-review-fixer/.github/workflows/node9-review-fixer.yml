@@ -1,0 +1,64 @@
+# node9 CI Code Review & Fix
+#
+# Copy this file to .github/workflows/node9-review-fixer.yml in your repo.
+# Add two secrets in Settings → Secrets:
+#   ANTHROPIC_API_KEY  — from console.anthropic.com
+#   NODE9_API_KEY      — from node9.ai dashboard
+#
+# That's it. Every push to a feature branch triggers an AI code review.
+# You get one notification in the node9 dashboard. Click Approve & Merge,
+# Discard, or Run Again with optional feedback.
+
+name: node9 AI Code Review
+
+on:
+  push:
+    branches:
+      - '**'
+      - '!main'
+      - '!master'
+      - '!node9/**'    # Ignore node9's own fix branches
+  repository_dispatch:
+    types: [node9-run-again]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write      # push fix branch
+      pull-requests: write # open Draft PR
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "node9[bot]"
+          git config user.email "bot@node9.ai"
+          git fetch origin ${{ github.base_ref || 'main' }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install anthropic node9 python-dotenv
+
+      - name: Run node9 review
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          NODE9_API_KEY: ${{ secrets.NODE9_API_KEY }}
+          NODE9_API_URL: https://api.node9.ai/api/v1/intercept
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_HEAD_REF: ${{ github.event.client_payload.head_ref || github.head_ref || github.ref_name }}
+          GITHUB_BASE_REF: ${{ github.event.client_payload.base_ref || github.base_ref || 'main' }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          CI: 'true'
+          ITERATION: ${{ github.event.client_payload.iteration || '1' }}
+          FEEDBACK: ${{ toJSON(github.event.client_payload.feedback) || '' }}
+          DRAFT_PR_NUMBER: ${{ github.event.client_payload.draft_pr_number || '' }}
+        run: python .github/node9/agent.py
