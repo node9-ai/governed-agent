@@ -1,7 +1,5 @@
-fastapi
-uvicorn
-anthropic
-python-dotenv
-httpx
-# The actual PyPI package name
-node9==1.1.1
+anthropic>=0.40.0
+fastapi>=0.115.0
+uvicorn>=0.32.0
+python-dotenv>=1.0.0
+node9>=2.0.0

@@ -1,0 +1,44 @@
+name: node9 CI Code Review
+
+on:
+  push:
+    branches-ignore:
+      - main
+      - 'node9/fix/**'   # don't re-review the agent's own fix branches
+  workflow_dispatch:     # allow manual trigger for testing
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write    # push fix branch
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history needed for git diff
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install agent dependencies
+        working-directory: ci-code-review-fixer
+        run: pip install -r requirements.txt
+
+      - name: Run node9 CI code review
+        working-directory: ci-code-review-fixer
+        env:
+          ANTHROPIC_API_KEY:  ${{ secrets.ANTHROPIC_API_KEY }}
+          NODE9_API_KEY:      ${{ secrets.NODE9_API_KEY }}
+          NODE9_AGENT_NAME:   ci-code-review
+          NODE9_AGENT_POLICY: audit
+          NODE9_TEST_CMD:     ${{ vars.NODE9_TEST_CMD || 'npm test' }}
+          GITHUB_TOKEN:       ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY:  ${{ github.repository }}
+          GITHUB_HEAD_REF:    ${{ github.ref_name }}
+          GITHUB_BASE_REF:    ${{ github.event.repository.default_branch || 'main' }}
+          GITHUB_WORKSPACE:   ${{ github.workspace }}
+        run: python agent.py
