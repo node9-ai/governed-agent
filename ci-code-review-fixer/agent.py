@@ -32,7 +32,10 @@ import urllib.error
 import urllib.request
 
 import anthropic
+from dotenv import load_dotenv
 from node9 import configure
+
+load_dotenv()
 
 import tools
 
@@ -470,3 +473,4 @@ if __name__ == "__main__":
         print("Error: ANTHROPIC_API_KEY not set", file=sys.stderr)
         sys.exit(1)
     execute_review_fix()
+// test
