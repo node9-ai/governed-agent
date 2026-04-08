@@ -163,7 +163,20 @@ TOOL_SPECS = [
 ]
 
 
+_TOOL_ALLOWED_KEYS: dict[str, set[str]] = {
+    "read_code":  {"filename"},
+    "write_code": {"filename", "content"},
+    "run_bash":   {"command"},
+}
+
+
 def dispatch(tool_name: str, tool_input: dict) -> str:
+    allowed = _TOOL_ALLOWED_KEYS.get(tool_name)
+    if allowed is None:
+        return f"Unknown tool: {tool_name}"
+    unexpected = set(tool_input.keys()) - allowed
+    if unexpected:
+        return f"Error: unexpected keys for {tool_name}: {sorted(unexpected)}"
     try:
         if tool_name == "read_code":
             return read_code(**tool_input)
@@ -171,6 +184,6 @@ def dispatch(tool_name: str, tool_input: dict) -> str:
             return write_code(**tool_input)
         if tool_name == "run_bash":
             return run_bash(**tool_input)
-        return f"Unknown tool: {tool_name}"
     except (ValueError, TypeError) as e:
         return f"Error: {e}"
+    return f"Unknown tool: {tool_name}"
