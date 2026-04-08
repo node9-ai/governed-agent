@@ -222,6 +222,15 @@ def _github_request(method: str, path: str, body: dict | None = None) -> tuple[d
             return {}, e.code
 
 
+def _find_existing_pr(head_branch: str, base_branch: str) -> tuple[int | None, str]:
+    """Find an open PR for head_branch → base_branch, if one exists."""
+    owner = REPO.split("/")[0]
+    prs, _ = _github_request("GET", f"/repos/{REPO}/pulls?head={owner}:{head_branch}&base={base_branch}&state=open")
+    if isinstance(prs, list) and prs:
+        return prs[0].get("number"), prs[0].get("html_url", "")
+    return None, ""
+
+
 def _open_or_find_pr(fix_branch: str, base_branch: str, title: str, body: str) -> tuple[int | None, str]:
     result, status = _github_request("POST", f"/repos/{REPO}/pulls", {
         "title": title, "head": fix_branch, "base": base_branch, "draft": True, "body": body,
@@ -499,48 +508,53 @@ def execute_review_fix() -> None:
     security_text = _step4_security_review(diff)
     print(f"  Security review done ({len(security_text)} chars)", flush=True)
 
-    # Commit and push
-    tools._run_unprotected("git config user.email 'node9-ci@node9.ai'")
-    tools._run_unprotected("git config user.name 'node9 CI'")
-    tools._run_unprotected(f"git checkout -B {fix_branch}")
-
-    if files_changed:
-        tools._run_unprotected("git add -A")
-
-    subprocess.run(
-        ["git", "commit", "-m", f"node9 review: {len(files_changed)} file(s) fixed", "--allow-empty"],
-        cwd=tools.WORKSPACE_DIR,
-    )
-    tools._run_unprotected(f"git push origin {fix_branch} --force")
-
-    # Open PR
-    pr_body  = f"## 🤖 node9 AI Code Review\n\n"
-    pr_body += f"**Branch:** `{head_branch}` → `{BASE_BRANCH}`\n\n"
-    if files_changed:
-        pr_body += f"**Files fixed:** {', '.join(f'`{f}`' for f in files_changed)}\n\n"
-    pr_body += f"**Tests:** {'✓ passing' if tests_passed_before else '✗ failing'} → after AI: {after_summary.strip()[:100]}\n\n"
-    pr_body += "\n---\n*Governed by [node9](https://node9.ai) — full audit trail at node9.ai*"
-
-    pr_number, pr_url = _open_or_find_pr(
-        fix_branch, BASE_BRANCH,
-        f"[node9] AI review: {head_branch}",
-        pr_body,
-    )
-
-    # Post review as comment
-    if pr_number:
+    # Post code review + security review on the original PR (your branch → main)
+    original_pr_number, original_pr_url = _find_existing_pr(head_branch, BASE_BRANCH)
+    if original_pr_number:
         comment  = f"## 🔍 node9 Code Review\n\n{review_text}\n\n"
         comment += "---\n*Automated review by [node9](https://node9.ai)*"
-        _post_pr_comment(pr_number, comment)
+        _post_pr_comment(original_pr_number, comment)
 
         security_comment  = f"## 🔒 node9 Security Review\n\n{security_text}\n\n"
         security_comment += "---\n*Automated security review by [node9](https://node9.ai)*"
-        _post_pr_comment(pr_number, security_comment)
-
-        print(f"\n✅ Draft PR #{pr_number}: {pr_url}", flush=True)
+        _post_pr_comment(original_pr_number, security_comment)
+        print(f"  Reviews posted on PR #{original_pr_number}", flush=True)
     else:
-        print(f"\n✅ Pushed to {fix_branch}", flush=True)
+        print("  No open PR found for this branch — reviews not posted", flush=True)
 
+    # If agent made fixes, open a separate fix PR
+    fix_pr_number, fix_pr_url = None, ""
+    if files_changed:
+        tools._run_unprotected("git config user.email 'node9-ci@node9.ai'")
+        tools._run_unprotected("git config user.name 'node9 CI'")
+        tools._run_unprotected(f"git checkout -B {fix_branch}")
+        tools._run_unprotected("git add -A")
+        subprocess.run(
+            ["git", "commit", "-m", f"node9 fix: {len(files_changed)} file(s) fixed"],
+            cwd=tools.WORKSPACE_DIR,
+        )
+        tools._run_unprotected(f"git push origin {fix_branch} --force")
+
+        fix_pr_body  = f"## 🤖 node9 AI Fixes\n\n"
+        fix_pr_body += f"**Branch:** `{head_branch}` → `{BASE_BRANCH}`\n\n"
+        fix_pr_body += f"**Files fixed:** {', '.join(f'`{f}`' for f in files_changed)}\n\n"
+        fix_pr_body += f"**Tests:** {'✓ passing' if tests_passed_before else '✗ failing'} → after AI: {after_summary.strip()[:100]}\n\n"
+        fix_pr_body += "\n---\n*Governed by [node9](https://node9.ai) — full audit trail at node9.ai*"
+
+        fix_pr_number, fix_pr_url = _open_or_find_pr(
+            fix_branch, BASE_BRANCH,
+            f"[node9] AI fixes: {head_branch}",
+            fix_pr_body,
+        )
+        if fix_pr_number:
+            self_review  = f"## 🔍 node9 Self-Review\n\n{review_text}\n\n"
+            self_review += "---\n*Automated self-review of AI fixes by [node9](https://node9.ai)*"
+            _post_pr_comment(fix_pr_number, self_review)
+            print(f"\n✅ Fix PR #{fix_pr_number}: {fix_pr_url}", flush=True)
+    else:
+        print(f"\n✅ No fixes needed", flush=True)
+
+    pr_url = fix_pr_url or original_pr_url
     _write_github_summary(pr_url, before_raw, after_summary, review_text)
 
 
