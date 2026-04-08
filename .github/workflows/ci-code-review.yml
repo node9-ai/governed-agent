@@ -33,6 +33,7 @@ jobs:
         env:
           ANTHROPIC_API_KEY:  ${{ secrets.ANTHROPIC_API_KEY }}
           NODE9_API_KEY:      ${{ secrets.NODE9_API_KEY }}
+          NODE9_API_URL:      ${{ secrets.NODE9_API_URL }}
           NODE9_AGENT_NAME:   ci-code-review
           NODE9_AGENT_POLICY: audit
           NODE9_TEST_CMD:     ${{ vars.NODE9_TEST_CMD || 'npm test' }}

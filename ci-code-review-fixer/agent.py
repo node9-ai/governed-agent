@@ -32,7 +32,10 @@ import urllib.error
 import urllib.request
 
 import anthropic
+from dotenv import load_dotenv
 from node9 import configure
+
+load_dotenv()
 
 import tools
 
