@@ -5,6 +5,7 @@ Pipeline:
   1. Fix loop    — read diff, fix bugs, run tests (max 6 turns, token-capped)
   2. Safety check — revert AI changes if tests break
   3. Code review  — one-shot review of agent's own diff, posted as PR comment
+  4. Security review — data-flow focused pass on the original PR diff, posted as separate PR comment
 
 Token discipline:
   - Diff filtered (no lock files / generated files) and chunked to 8k chars
@@ -388,6 +389,40 @@ def _step3_code_review(original_diff: str, agent_diff: str, before_summary: str,
     return response.content[0].text.strip()
 
 
+def _step4_security_review(original_diff: str) -> str:
+    """
+    Dedicated security pass on the original PR diff.
+    Focuses on data-flow issues that general reviewers miss:
+    user-controlled inputs reaching filesystem/exec/network sinks.
+    """
+    prompt = (
+        "You are a security engineer doing a focused security review of a pull request.\n\n"
+        f"## PR diff:\n```diff\n{_chunk_diff(original_diff, 6000)}\n```\n\n"
+        "Your job: find security vulnerabilities only. Ignore style, performance, and design.\n\n"
+        "For each changed function or code block, ask:\n"
+        "1. **Input sources** — does it accept user-controlled input? "
+        "(CLI args, HTTP params, file content, env vars, external API responses)\n"
+        "2. **Sink reachability** — does that input reach a dangerous sink without sanitization?\n"
+        "   - Filesystem: `path.join`, `fs.writeFile`, `open()`, file paths constructed from input\n"
+        "   - Execution: `exec`, `spawn`, `eval`, `subprocess`\n"
+        "   - Network: URLs constructed from input\n"
+        "   - Deserialization: `JSON.parse`, `pickle`, `yaml.load` on untrusted input\n"
+        "3. **Validation gaps** — is there input validation? Is it bypassable? "
+        "(e.g. allowlist vs blocklist, regex anchoring, type checks)\n\n"
+        "Format your findings as:\n"
+        "- **[SEVERITY]** `file:function` — description of the issue and how to exploit it\n\n"
+        "Severity levels: HIGH (exploitable now), MEDIUM (exploitable with attacker control), "
+        "LOW (theoretical / defense-in-depth).\n\n"
+        "If you find no issues, say: `✅ No security issues found.`\n"
+        "Keep findings under 600 words. No preamble."
+    )
+
+    response = _create_with_retry(
+        client, model=MODEL, max_tokens=1000, messages=[{"role": "user", "content": prompt}]
+    )
+    return response.content[0].text.strip()
+
+
 # ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
@@ -428,6 +463,11 @@ def execute_review_fix() -> None:
     review_text  = _step3_code_review(diff, agent_diff, before_summary, after_summary)
     print(f"  Review done ({len(review_text)} chars)", flush=True)
 
+    # Step 4: Security review of the original PR diff
+    print("\n🔒 Security review...", flush=True)
+    security_text = _step4_security_review(diff)
+    print(f"  Security review done ({len(security_text)} chars)", flush=True)
+
     # Commit and push
     tools._run_unprotected("git config user.email 'node9-ci@node9.ai'")
     tools._run_unprotected("git config user.name 'node9 CI'")
@@ -461,6 +501,11 @@ def execute_review_fix() -> None:
         comment  = f"## 🔍 node9 Code Review\n\n{review_text}\n\n"
         comment += "---\n*Automated review by [node9](https://node9.ai)*"
         _post_pr_comment(pr_number, comment)
+
+        security_comment  = f"## 🔒 node9 Security Review\n\n{security_text}\n\n"
+        security_comment += "---\n*Automated security review by [node9](https://node9.ai)*"
+        _post_pr_comment(pr_number, security_comment)
+
         print(f"\n✅ Draft PR #{pr_number}: {pr_url}", flush=True)
     else:
         print(f"\n✅ Pushed to {fix_branch}", flush=True)
