@@ -49,7 +49,7 @@ def write_code(filename: str, content: str) -> str:
     hit = dlp_scan(filename, content)
     if hit:
         return f"BLOCKED by DLP: {hit}. Do not write secrets to files."
-    path = safe_path(filename, WORKSPACE_DIR)
+    path = safe_path(filename, workspace=WORKSPACE_DIR)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
         f.write(content)
@@ -59,7 +59,7 @@ def write_code(filename: str, content: str) -> str:
 @protect("read_code")
 def read_code(filename: str) -> str:
     """Read a file or list a directory in the workspace."""
-    path = safe_path(filename, WORKSPACE_DIR)
+    path = safe_path(filename, workspace=WORKSPACE_DIR)
     if not os.path.exists(path):
         return f"Error: {filename} not found"
     if os.path.isdir(path):
