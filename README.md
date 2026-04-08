@@ -26,6 +26,7 @@ This creates **Governed Autonomy**: the AI provides the speed, the human provide
 
 | Agent | Purpose | Governance Logic |
 |-------|---------|-----------------|
+| [CI Code Review](./ci-code-review-fixer/) | Autonomous PR review, bug fixing, and security analysis | Every file read, write, and bash command is audited via node9; prompt injection mitigations on security review output; tool inputs validated against allowlist |
 | [Marketing Agent](./governed_marketing_agent.py) | Autonomous content creation | Intercepts `medium_publish` calls — human approves or denies the post via Slack / Terminal before any draft goes live |
 | Safe SQL Admin *(coming soon)* | Natural language DB management | Allows `SELECT` and `INSERT` globally; triggers a Race for Approval on `DROP`, `TRUNCATE`, or `DELETE` |
 | DevOps Guard *(coming soon)* | Shell-based infrastructure automation | Governs sensitive bash commands; blocks unauthorized access to `.env` or `~/.ssh` |
