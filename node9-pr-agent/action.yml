@@ -1,0 +1,76 @@
+name: 'node9 AI Code Review & Fix'
+description: 'AI-powered code review, bug fixing, and security analysis — governed by node9'
+author: 'node9'
+
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  anthropic_api_key:
+    description: 'Anthropic API key'
+    required: true
+  node9_api_key:
+    description: 'node9 SaaS key for audit trail'
+    required: false
+    default: ''
+  node9_api_url:
+    description: 'node9 API URL override'
+    required: false
+    default: ''
+  github_token:
+    description: 'GitHub token for PR operations'
+    required: true
+  test_cmd:
+    description: 'Command to run tests'
+    required: false
+    default: 'npm test'
+  head_ref:
+    description: 'Head branch being reviewed'
+    required: false
+    default: ''
+  base_ref:
+    description: 'Base branch to diff against'
+    required: false
+    default: 'main'
+  iteration:
+    description: 'Run iteration number (for run-again)'
+    required: false
+    default: '1'
+  feedback:
+    description: 'Feedback for run-again'
+    required: false
+    default: ''
+  draft_pr_number:
+    description: 'Existing draft PR number (for run-again)'
+    required: false
+    default: ''
+
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install node9 agent dependencies
+      shell: bash
+      run: pip install -r ${{ github.action_path }}/requirements.txt
+
+    - name: Run node9 review
+      shell: bash
+      env:
+        PYTHONUNBUFFERED: '1'
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic_api_key }}
+        NODE9_API_KEY: ${{ inputs.node9_api_key }}
+        NODE9_API_URL: ${{ inputs.node9_api_url }}
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+        GITHUB_HEAD_REF: ${{ inputs.head_ref }}
+        GITHUB_BASE_REF: ${{ inputs.base_ref }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        NODE9_TEST_CMD: ${{ inputs.test_cmd }}
+        CI: 'true'
+        ITERATION: ${{ inputs.iteration }}
+        FEEDBACK: ${{ inputs.feedback }}
+        DRAFT_PR_NUMBER: ${{ inputs.draft_pr_number }}
+      run: python ${{ github.action_path }}/agent.py

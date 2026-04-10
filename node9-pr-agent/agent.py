@@ -43,7 +43,7 @@ import tools
 # ---------------------------------------------------------------------------
 # Identity
 # ---------------------------------------------------------------------------
-configure(agent_name="ci-code-review", policy="audit")
+configure(agent_name="ci-code-review", policy="standard")
 
 MODEL        = "claude-sonnet-4-6"
 MAX_FIX_TURNS = 6
@@ -104,8 +104,12 @@ def _count_diff_lines(diff: str) -> int:
 # Test output helpers
 # ---------------------------------------------------------------------------
 
+_SAFE_TEST_CMD_RE = re.compile(r'^[\w\s./:@=&|,\-\+\^\(\)\"\']+$')
+
 def _run_tests(cmd: str) -> tuple[str, int]:
     """Run tests and return (output, exit_code)."""
+    if not _SAFE_TEST_CMD_RE.match(cmd):
+        return f"Error: test command rejected — contains unsafe characters: {cmd!r}", 1
     proc = subprocess.run(
         cmd, shell=True, capture_output=True, text=True, cwd=tools.WORKSPACE_DIR
     )
@@ -173,7 +177,7 @@ def _apply_rolling_cache(messages: list) -> None:
     for msg in reversed(messages):
         if msg["role"] == "user" and isinstance(msg["content"], list):
             for block in reversed(msg["content"]):
-                if isinstance(block, dict):
+                if isinstance(block, dict) and block.get("type") == "text":
                     block["cache_control"] = {"type": "ephemeral"}
                     return
 
@@ -310,7 +314,6 @@ def _step1_fix_loop(
             system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
             tools=tools.TOOL_SPECS,
             messages=messages,
-            extra_headers={"anthropic-beta": "prompt-caching-2024-07-31"},
         )
 
         messages.append({"role": "assistant", "content": response.content})
@@ -469,6 +472,7 @@ def _step4_security_review(original_diff: str) -> str:
 
 def execute_review_fix() -> None:
     head_branch = _resolve_branch()
+    head_branch = re.sub(r"[^\w./-]", "-", head_branch)
     fix_branch  = f"node9/fix/{head_branch}"
 
     print(f"\n🤖 node9 CI Review: {head_branch} → {BASE_BRANCH}", flush=True)
@@ -536,15 +540,20 @@ def execute_review_fix() -> None:
     # If agent made fixes, open a separate fix PR
     fix_pr_number, fix_pr_url = None, ""
     if files_changed:
-        tools._run_unprotected("git config user.email 'node9-ci@node9.ai'")
-        tools._run_unprotected("git config user.name 'node9 CI'")
-        tools._run_unprotected(f"git checkout -B {fix_branch}")
-        tools._run_unprotected("git add -A")
-        subprocess.run(
-            ["git", "commit", "-m", f"node9 fix: {len(files_changed)} file(s) fixed"],
+        subprocess.run(["git", "config", "user.email", "node9-ci@node9.ai"], cwd=tools.WORKSPACE_DIR)
+        subprocess.run(["git", "config", "user.name", "node9 CI"], cwd=tools.WORKSPACE_DIR)
+        subprocess.run(["git", "checkout", "-B", fix_branch], cwd=tools.WORKSPACE_DIR)
+        subprocess.run(["git", "add", "-A"], cwd=tools.WORKSPACE_DIR)
+        staged = subprocess.run(
+            ["git", "diff", "--staged", "--quiet"],
             cwd=tools.WORKSPACE_DIR,
         )
-        tools._run_unprotected(f"git push origin {fix_branch} --force")
+        if staged.returncode != 0:
+            subprocess.run(
+                ["git", "commit", "-m", f"node9 fix: {len(files_changed)} file(s) fixed"],
+                cwd=tools.WORKSPACE_DIR,
+            )
+        subprocess.run(["git", "push", "origin", fix_branch, "--force"], cwd=tools.WORKSPACE_DIR)
 
         fix_pr_body  = f"## 🤖 node9 AI Fixes\n\n"
         fix_pr_body += f"**Branch:** `{head_branch}` → `{BASE_BRANCH}`\n\n"

@@ -25,11 +25,11 @@ jobs:
           python-version: '3.12'
 
       - name: Install agent dependencies
-        working-directory: ci-code-review-fixer
+        working-directory: node9-pr-agent
         run: pip install -r requirements.txt
 
       - name: Run node9 CI code review
-        working-directory: ci-code-review-fixer
+        working-directory: node9-pr-agent
         env:
           ANTHROPIC_API_KEY:  ${{ secrets.ANTHROPIC_API_KEY }}
           NODE9_API_KEY:      ${{ secrets.NODE9_API_KEY }}
