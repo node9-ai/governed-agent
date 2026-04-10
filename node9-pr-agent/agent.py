@@ -104,8 +104,12 @@ def _count_diff_lines(diff: str) -> int:
 # Test output helpers
 # ---------------------------------------------------------------------------
 
+_SAFE_TEST_CMD_RE = re.compile(r'^[\w\s./:@=&|,\-\+\^\(\)\"\']+$')
+
 def _run_tests(cmd: str) -> tuple[str, int]:
     """Run tests and return (output, exit_code)."""
+    if not _SAFE_TEST_CMD_RE.match(cmd):
+        return f"Error: test command rejected — contains unsafe characters: {cmd!r}", 1
     proc = subprocess.run(
         cmd, shell=True, capture_output=True, text=True, cwd=tools.WORKSPACE_DIR
     )
