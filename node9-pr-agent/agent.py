@@ -43,7 +43,7 @@ import tools
 # ---------------------------------------------------------------------------
 # Identity
 # ---------------------------------------------------------------------------
-configure(agent_name="ci-code-review", policy="audit")
+configure(agent_name="ci-code-review", policy="standard")
 
 MODEL        = "claude-sonnet-4-6"
 MAX_FIX_TURNS = 6
@@ -173,7 +173,7 @@ def _apply_rolling_cache(messages: list) -> None:
     for msg in reversed(messages):
         if msg["role"] == "user" and isinstance(msg["content"], list):
             for block in reversed(msg["content"]):
-                if isinstance(block, dict):
+                if isinstance(block, dict) and block.get("type") == "text":
                     block["cache_control"] = {"type": "ephemeral"}
                     return
 
