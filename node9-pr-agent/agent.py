@@ -310,7 +310,6 @@ def _step1_fix_loop(
             system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
             tools=tools.TOOL_SPECS,
             messages=messages,
-            extra_headers={"anthropic-beta": "prompt-caching-2024-07-31"},
         )
 
         messages.append({"role": "assistant", "content": response.content})
