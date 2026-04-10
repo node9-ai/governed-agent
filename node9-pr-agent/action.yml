@@ -69,7 +69,6 @@ runs:
         GITHUB_BASE_REF: ${{ inputs.base_ref }}
         GITHUB_REPOSITORY: ${{ github.repository }}
         NODE9_TEST_CMD: ${{ inputs.test_cmd }}
-        NODE9_TESTING: '1'
         CI: 'true'
         ITERATION: ${{ inputs.iteration }}
         FEEDBACK: ${{ inputs.feedback }}

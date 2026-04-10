@@ -468,6 +468,7 @@ def _step4_security_review(original_diff: str) -> str:
 
 def execute_review_fix() -> None:
     head_branch = _resolve_branch()
+    head_branch = re.sub(r"[^\w./-]", "-", head_branch)
     fix_branch  = f"node9/fix/{head_branch}"
 
     print(f"\n🤖 node9 CI Review: {head_branch} → {BASE_BRANCH}", flush=True)
@@ -535,10 +536,10 @@ def execute_review_fix() -> None:
     # If agent made fixes, open a separate fix PR
     fix_pr_number, fix_pr_url = None, ""
     if files_changed:
-        tools._run_unprotected("git config user.email 'node9-ci@node9.ai'")
-        tools._run_unprotected("git config user.name 'node9 CI'")
-        tools._run_unprotected(f"git checkout -B {fix_branch}")
-        tools._run_unprotected("git add -A")
+        subprocess.run(["git", "config", "user.email", "node9-ci@node9.ai"], cwd=tools.WORKSPACE_DIR)
+        subprocess.run(["git", "config", "user.name", "node9 CI"], cwd=tools.WORKSPACE_DIR)
+        subprocess.run(["git", "checkout", "-B", fix_branch], cwd=tools.WORKSPACE_DIR)
+        subprocess.run(["git", "add", "-A"], cwd=tools.WORKSPACE_DIR)
         staged = subprocess.run(
             ["git", "diff", "--staged", "--quiet"],
             cwd=tools.WORKSPACE_DIR,
@@ -548,7 +549,7 @@ def execute_review_fix() -> None:
                 ["git", "commit", "-m", f"node9 fix: {len(files_changed)} file(s) fixed"],
                 cwd=tools.WORKSPACE_DIR,
             )
-        tools._run_unprotected(f"git push origin {fix_branch} --force")
+        subprocess.run(["git", "push", "origin", fix_branch, "--force"], cwd=tools.WORKSPACE_DIR)
 
         fix_pr_body  = f"## 🤖 node9 AI Fixes\n\n"
         fix_pr_body += f"**Branch:** `{head_branch}` → `{BASE_BRANCH}`\n\n"
