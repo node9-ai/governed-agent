@@ -2,7 +2,7 @@
 
 > **Blueprints for the Agentic Era** — a curated gallery of autonomous AI agents that are safe to run on local machines, production databases, and sensitive APIs.
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Node9](https://img.shields.io/badge/governed%20by-Node9-6366f1)](https://node9.ai)
 [![Python](https://img.shields.io/badge/python-3.10%2B-3776ab)](https://python.org)
 
@@ -114,4 +114,4 @@ Each agent submission should include:
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+Apache 2.0 — see [LICENSE](LICENSE).
