@@ -147,4 +147,4 @@ The agent runs with `node9` in `audit` mode — every tool call (file read, file
 
 ## License
 
-MIT — see [LICENSE](../LICENSE).
+Apache 2.0 — see [LICENSE](../LICENSE).
